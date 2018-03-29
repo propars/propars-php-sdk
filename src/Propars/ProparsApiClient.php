@@ -31,7 +31,6 @@ class Client
         if(substr($endpoint, 0, strlen(API_ROOT)) !== API_ROOT){
             $endpoint = API_ROOT.$endpoint;
         }
-        print_r($endpoint."\n");
 
         $crl = curl_init();
 
@@ -48,6 +47,10 @@ class Client
             curl_setopt($crl, CURLOPT_POST, true);
             curl_setopt($crl, CURLOPT_POSTFIELDS, json_encode($data));
         }
+        if(strtoupper($method) === 'DELETE'){
+            curl_setopt($crl, CURLOPT_CUSTOMREQUEST, "DELETE");
+        }
+
         $rest = curl_exec($crl);
 
         $httpcode = curl_getinfo($crl, CURLINFO_HTTP_CODE);
@@ -65,9 +68,6 @@ class Client
 class ProparsObjectSet
 {
     private $default_page_size = 30;
-    private $api;
-    private $query_params;
-    private $_response;
 
     function __construct($api, $query_params = null)
     {
@@ -77,11 +77,6 @@ class ProparsObjectSet
         $this->_response = null;
     }
 
-    /*
-
-    function __str__():
-        return '<{} {}?{}>'.format($this->__class__.__name__, $this->api.resource, $this->get_query_string())
-    */
     private function get_query_string()
     {
         # TODO urlencode
@@ -115,8 +110,8 @@ class ProparsObjectSet
     }
 
     public function getByIndex($index){
-        $_limit = in_array('limit', $this->query_params) ? $this->query_params['limit'] : $this->default_page_size;
-        $_offset = in_array('offset', $this->query_params) ? $this->query_params['offset'] : 0;
+        $_limit = array_key_exists('limit', $this->query_params) ? $this->query_params['limit'] : $this->default_page_size;
+        $_offset = array_key_exists('offset', $this->query_params) ? $this->query_params['offset'] : 0;
         if($index <= ($_limit + $_offset)){
             return $this->results()[$index];
         } else {
@@ -127,6 +122,11 @@ class ProparsObjectSet
     public function update($data, $pk = null)
     {
         return $this->__call_api($method = 'PATCH', $data, $pk);
+    }
+
+    public function delete(&$pk)
+    {
+        return $this->__call_api($method = 'DELETE', $data=null, $pk);
     }
 
     public function page_context()
@@ -170,7 +170,13 @@ class ProparsObjectSet
 
     public function page($page_num, $page_size = null)
     {
-        $page_size = $page_size ? $page_size : $this->default_page_size;
+        if(is_null($page_size)){
+            if(array_key_exists('limit', $this->query_params))
+                $page_size = $this->query_params['limit'];
+            else
+                $page_size = $this->default_page_size;
+        }
+
         $page_num = $page_num < 1 ? 1 : $page_num;
         return $this->limit($page_size)->offset($page_size * ($page_num - 1));
     }
@@ -252,6 +258,11 @@ class ProparsResouce extends ProparsApiRoot
     public function update(&$pk, &$data)
     {
         return $this->object_set()->update($data, $pk);
+    }
+
+    public function delete(&$pk)
+    {
+        return $this->object_set()->delete($pk);
     }
 
     public function help()
